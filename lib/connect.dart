@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
@@ -8,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:usb_camera/camerPreview.dart';
 import 'package:usb_serial/transaction.dart';
 import 'package:usb_serial/usb_serial.dart';
+import 'package:external_app_launcher/external_app_launcher.dart';
 
 class ConnectTODevice extends StatefulWidget {
   @override
@@ -28,6 +30,7 @@ class _ConnectTODeviceState extends State<ConnectTODevice> {
   UsbDevice? _device;
 
   TextEditingController _textController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
 
   Future<bool> _connectTo(device) async {
     _serialData.clear();
@@ -155,76 +158,105 @@ class _ConnectTODeviceState extends State<ConnectTODevice> {
         title: const Text('USB Serial Plugin example app'),
       ),
       body: Center(
-          child: Column(children: <Widget>[
-        Text(
-            _ports.length > 0
-                ? "Available Serial Ports"
-                : "No serial devices available",
-            style: Theme.of(context).textTheme.headline6),
-        ..._ports,
-        Text('Status: $_status\n'),
-        Text('info: ${_port.toString()}\n'),
-        ListTile(
-          title: TextField(
-            controller: _textController,
-            decoration: InputDecoration(
-              border: OutlineInputBorder(),
-              labelText: 'Text To Send',
+          child: SingleChildScrollView(
+        child: Column(children: <Widget>[
+          Text(
+              _ports.length > 0
+                  ? "Available Serial Ports"
+                  : "No serial devices available",
+              style: Theme.of(context).textTheme.headline6),
+          ..._ports,
+          Text('Status: $_status\n'),
+          Text('info: ${_port.toString()}\n'),
+          // ElevatedButton(
+          //     onPressed: () async {
+          //       await LaunchApp.openApp(
+          //         androidPackageName: 'com.viprak.usbcamera',
+          //       );
+          //     },
+          //     child: Text("data")),
+          ListTile(
+            title: TextField(
+              controller: _textController,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Text To Send',
+              ),
+            ),
+            trailing: ElevatedButton(
+              child: Text("Send"),
+              onPressed: _port == null
+                  ? null
+                  : () async {
+                      if (_port == null) {
+                        return;
+                      }
+                      await _port!.open();
+                      _port!.inputStream!.listen((Uint8List event) {
+                        print(event);
+                        _port!.write(Uint8List.fromList("MID=12345".codeUnits));
+                      });
+                      // String data = _textController.text + "\r\n";
+                      // await _port!.write(Uint8List.fromList(data.codeUnits));
+                      // _textController.text = "";
+
+                      // List<int> list = 'MID=12345'.codeUnits;
+                      await _port?.open().then((value) {
+                        print(dataFromPort.toString() + "------");
+                        Timer(Duration(seconds: 2), () {
+                          _port!.close();
+                        });
+                      });
+
+                      await LaunchApp.openApp(
+                        androidPackageName: 'com.viprak.usbcamera',
+                      );
+
+                      // await LaunchApp.openApp(
+                      //   androidPackageName: 'com.mri.mrimastermain',
+                      // iosUrlScheme: 'pulsesecure://',
+                      // appStoreLink:
+                      //     'itms-apps://itunes.apple.com/us/app/pulse-secure/id945832041',
+                      // openStore: false
+                      // );
+                      // // if ( == "Booting system\r") {
+                      // await _port!.open();
+                      // await _port!
+                      //     .inputStream.listen(Uint8List.fromList(list))
+                      //     .then((value) async {
+
+                      // });
+
+                      // });
+
+                      // }
+                    },
             ),
           ),
-          trailing: ElevatedButton(
-            child: Text("Send"),
-            onPressed: _port == null
-                ? null
-                : () async {
-                    if (_port == null) {
-                      return;
-                    }
-                    await _port!.open();
-                    _port!.inputStream!.listen((Uint8List event) {
-                      print(event);
-                      _port!.write(Uint8List.fromList("MID=12345".codeUnits));
-                    });
-                    // String data = _textController.text + "\r\n";
-                    // await _port!.write(Uint8List.fromList(data.codeUnits));
-                    // _textController.text = "";
-
-                    // List<int> list = 'MID=12345'.codeUnits;
-                    await _port?.open().then((value) {
-                      print(dataFromPort.toString() + "------");
-                      Timer(Duration(seconds: 2), () {
-                        _port!.close();
-                      });
-                    });
-
-                    // // if ( == "Booting system\r") {
-                    // await _port!.open();
-                    // await _port!
-                    //     .inputStream.listen(Uint8List.fromList(list))
-                    //     .then((value) async {
-
-                    // });
-
-                    // });
-
-                    // }
-                  },
-          ),
-        ),
-        Text("Result Data", style: Theme.of(context).textTheme.headline6),
-        ..._serialData,
-        ElevatedButton(
-            onPressed: () async {
-              if (await Permission.camera.request().isGranted) {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) =>
-                            CamerPreview(camera: _cameras.last)));
-              }
+          Text("Result Data", style: Theme.of(context).textTheme.headline6),
+          ..._serialData,
+          Image.file(
+            File(imagePath),
+            errorBuilder: (context, error, stackTrace) {
+              return Text("No image selected");
             },
-            child: Text("Camera"))
-      ])),
+          ),
+          ElevatedButton(
+              onPressed: () async {
+                final XFile? image =
+                    await _picker.pickImage(source: ImageSource.gallery);
+                if (image != null) {
+                  setState(() {
+                    imagePath = "";
+                    imagePath = image.path;
+                  });
+                }
+              },
+              child: Text("Select Image"))
+        ]),
+      )),
     );
   }
+
+  String imagePath = "";
 }
